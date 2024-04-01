@@ -23,7 +23,7 @@
     },
     "content_scripts": [
         {
-            "matches": ["*://outlook.office.com/*"],
+            "matches": ["*://outlook.office.com/*","*://outlook.office365.com/*","*://attachments.office.net/*"],
             "js": ["content.js"]
         }
     ]

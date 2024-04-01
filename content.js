@@ -96,6 +96,33 @@ function delay(time) {
 }
 
 async function downloadEML(content) {
+    // Replace image URLs with base64-encoded image data
+    const contentWithEmbeddedImages = await replaceImageURLsWithBase64(content);
+
+    // Generate EML content with embedded images
+    const emlContent = generateEMLContent(contentWithEmbeddedImages);
+
+    // Download the EML file
+    downloadFile(emlContent, 'mail.eml');
+}
+
+async function replaceImageURLsWithBase64(content) {
+    // Copy the content object to avoid modifying the original
+    const modifiedContent = { ...content };
+
+    // Replace image URLs with base64-encoded image data
+    for (let attachment of modifiedContent.attachments) {
+        if (attachment.url.startsWith('cid:')) {
+            const base64ImageData = await fetchImageAsBase64(attachment.url);
+            attachment.url = `data:image/jpeg;base64,${base64ImageData}`;
+        }
+    }
+
+    return modifiedContent;
+}
+
+function generateEMLContent(content) {
+    // Generate EML content with embedded images
     let emlContent = `
 From: ${content.from}
 Subject: ${content.subject}
@@ -106,7 +133,7 @@ Content-Type: multipart/mixed; boundary="boundary123"
 Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: 7bit
 
-!<DOCTYPE html>
+<DOCTYPE html>
 <html>
 <head>
     <style>
@@ -114,7 +141,7 @@ Content-Transfer-Encoding: 7bit
             color: #000000 !important;
             background-color: #FFFFFF !important;
         }
-</style>
+    </style>
 </head>
 <body>
 ${content.body}
@@ -124,79 +151,52 @@ ${content.body}
 `;
 
     for (let attachment of content.attachments) {
-        let mimeType;
-
-        const extension = attachment.name.split('.').pop().toLowerCase();
-        switch (extension) {
-            case 'pdf':
-                mimeType = 'application/pdf';
-                break;
-            case 'doc':
-            case 'docx':
-                mimeType = 'application/vnd.ms-word';
-                break;
-            case 'jpg':
-            case 'jpeg':
-                mimeType = 'image/jpeg';
-                break;
-            case 'xls':
-            case 'xlsx':
-                mimeType = 'application/vnd.ms-excel';
-                break;
-            case 'ppt':
-            case 'pptx':
-                mimeType = 'application/vnd.ms-powerpoint';
-                break;
-            default:
-                mimeType = 'application/octet-stream';
-        }
-
-        try {
-            const fileBase64 = await fetchFileAsBase64(attachment.url);
-            emlContent += `--boundary123
-Content-Type: ${mimeType}; name="${attachment.name}"
+        emlContent += `--boundary123
+Content-Type: ${attachment.type}; name="${attachment.name}"
 Content-Disposition: attachment; filename="${attachment.name}"
 Content-Transfer-Encoding: base64
 
-${fileBase64}
+${attachment.data}
 
 `;
-        } catch (error) {
-            console.error(`Failed to process ${attachment.name}:`, error);
-        }
     }
 
     emlContent += `--boundary123--`;
 
-    const blob = new Blob([emlContent], { type: 'message/rfc822' });
+    return emlContent;
+}
+
+function downloadFile(content, filename) {
+    // Create a Blob object from the content
+    const blob = new Blob([content], { type: 'message/rfc822' });
+
+    // Create a temporary URL for the Blob
     const url = URL.createObjectURL(blob);
 
+    // Create a link element to trigger the download
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'mail';
+    a.download = filename;
+
+    // Trigger the download
     document.body.appendChild(a);
     a.click();
 
+    // Cleanup
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
 
-
-function fetchFileAsBase64(url) {
-    return fetch(url)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
-            }
-            return response.arrayBuffer();
-        })
-        .then(buffer => {
-            return arrayBufferToBase64(buffer);
-        })
-        .catch(error => {
-            console.error('Error fetching file:', error);
-            throw error;
-        });
+async function fetchImageAsBase64(url) {
+    // Fetch the image and convert it to base64
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 }
 
 function arrayBufferToBase64(buffer) {
