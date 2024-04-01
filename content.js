@@ -1,49 +1,45 @@
-chrome.runtime.onMessage.addListener(
-    async (request, sender, sendResponse) => {
-        if (request.action === "downloadEmail") {
-            for (let i = 0; i < 3; i++) {
-                console.log('Step: ' + i)
-                await downloadEmail(request, sender, sendResponse, 2000 * i)
-            }
-        }
-    },
-);
+// Define constants for timeouts
+const EMAIL_DOWNLOAD_DELAY = 1000;
+const ATTACHMENT_PREVIEW_DELAY = 1000;
 
-async function downloadEmail(request, sender, sendResponse, scrollDown) {
-    const listOfEmailItems = document.querySelectorAll('#MailList .customScrollBar > div > div > div > div');
+// Listen for messages from the extension
+chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
+    if (request.action === "downloadEmail") {
+        // Download email content
+        const emailsContent = await downloadEmails();
+        sendResponse({ content: emailsContent });
+    }
+});
 
+async function downloadEmails() {
     const emailsContent = [];
+
+    // Loop through email items
+    const listOfEmailItems = document.querySelectorAll('#MailList .customScrollBar > div > div > div > div');
     for (let email of listOfEmailItems) {
-        if (
-            email.role !== 'heading'
-            && email.clientHeight > 0
-        ) {
+        if (email.role !== 'heading' && email.clientHeight > 0) {
             email.click();
-            await delay(1000);
-            console.log('downloadEmail accept');
+            await delay(EMAIL_DOWNLOAD_DELAY);
             const emailContent = await getEmailContent();
-            console.log(emailContent);
             emailsContent.push(emailContent);
-            await downloadEML(emailContent)
+            await downloadEML(emailContent);
         }
     }
-    console.log(emailsContent);
-    sendResponse({ content: emailsContent });
-    const positionY = 1000 + scrollDown;
-    document.querySelector('#MailList .customScrollBar').scroll(0, positionY);
+
+    return emailsContent;
 }
 
 async function getEmailContent() {
-    let emailContent = {
+    const emailContent = {
         from: "",
         subject: "",
         body: "",
-        attachments: [],
+        attachments: []
     };
 
-    const headerElement = document.querySelector("#ConversationReadingPaneContainer [title]").getAttribute('title');
+    const headerElement = document.querySelector("#ConversationReadingPaneContainer [title]");
     if (headerElement) {
-        emailContent.subject = headerElement;
+        emailContent.subject = headerElement.getAttribute('title');
     }
 
     const bodyElement = document.querySelector("#UniqueMessageBody");
@@ -51,34 +47,24 @@ async function getEmailContent() {
         emailContent.body = bodyElement.innerHTML;
     }
 
-    let attachmentsFiles = document.querySelectorAll('.wide-content-host [role="listbox"] > div > div');
-
-    if (attachmentsFiles.length > 0) {
-        for (let i = 0; i < attachmentsFiles.length; i++) {
-            document.querySelectorAll('.wide-content-host [role="listbox"] > div > div')[i].click()
-            console.log('Open File Preview')
-            await delay(1000)
-
-            emailContent.attachments.push(await getAttachment());
-
-            // Close preview
-            document.querySelectorAll('.ms-Modal-scrollableContent > div > div')[0].querySelector(
-                'button[title="Close"]').click()
-            console.log('Close File Preview')
-            await delay(1000)
-        }
+    const attachments = document.querySelectorAll('.wide-content-host [role="listbox"] > div > div');
+    for (let attachment of attachments) {
+        attachment.click();
+        await delay(ATTACHMENT_PREVIEW_DELAY);
+        const attachmentInfo = await getAttachment();
+        emailContent.attachments.push(attachmentInfo);
     }
 
     return emailContent;
 }
 
 async function getAttachment() {
-    let previewWindow = document.querySelectorAll('.ms-Modal-scrollableContent > div > div');
-    let fileName = previewWindow[0].querySelector('div').title;
-    let filePath = '';
+    const previewWindow = document.querySelectorAll('.ms-Modal-scrollableContent > div > div');
+    const fileName = previewWindow[0].querySelector('div').title;
 
-    let filePathElement = previewWindow[1].querySelector('object');
-    let filePathImageElement = previewWindow[1].querySelector('img');
+    let filePath = '';
+    const filePathElement = previewWindow[1].querySelector('object');
+    const filePathImageElement = previewWindow[1].querySelector('img');
     if (filePathElement) {
         filePath = filePathElement.data;
     } else if (filePathImageElement) {
@@ -87,7 +73,7 @@ async function getAttachment() {
 
     return {
         name: fileName,
-        url: filePath,
+        url: filePath
     };
 }
 
@@ -96,33 +82,6 @@ function delay(time) {
 }
 
 async function downloadEML(content) {
-    // Replace image URLs with base64-encoded image data
-    const contentWithEmbeddedImages = await replaceImageURLsWithBase64(content);
-
-    // Generate EML content with embedded images
-    const emlContent = generateEMLContent(contentWithEmbeddedImages);
-
-    // Download the EML file
-    downloadFile(emlContent, 'mail.eml');
-}
-
-async function replaceImageURLsWithBase64(content) {
-    // Copy the content object to avoid modifying the original
-    const modifiedContent = { ...content };
-
-    // Replace image URLs with base64-encoded image data
-    for (let attachment of modifiedContent.attachments) {
-        if (attachment.url.startsWith('cid:')) {
-            const base64ImageData = await fetchImageAsBase64(attachment.url);
-            attachment.url = `data:image/jpeg;base64,${base64ImageData}`;
-        }
-    }
-
-    return modifiedContent;
-}
-
-function generateEMLContent(content) {
-    // Generate EML content with embedded images
     let emlContent = `
 From: ${content.from}
 Subject: ${content.subject}
@@ -133,7 +92,7 @@ Content-Type: multipart/mixed; boundary="boundary123"
 Content-Type: text/html; charset="UTF-8"
 Content-Transfer-Encoding: 7bit
 
-<DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
     <style>
@@ -147,56 +106,48 @@ Content-Transfer-Encoding: 7bit
 ${content.body}
 </body>
 </html>
-
 `;
 
     for (let attachment of content.attachments) {
-        emlContent += `--boundary123
-Content-Type: ${attachment.type}; name="${attachment.name}"
+        if (attachment.url) {
+            try {
+                const fileBase64 = await fetchFileAsBase64(attachment.url);
+                emlContent += `--boundary123
+Content-Type: application/octet-stream; name="${attachment.name}"
 Content-Disposition: attachment; filename="${attachment.name}"
 Content-Transfer-Encoding: base64
 
-${attachment.data}
+${fileBase64}
 
 `;
+            } catch (error) {
+                console.error(`Failed to process ${attachment.name}:`, error);
+            }
+        }
     }
 
     emlContent += `--boundary123--`;
 
-    return emlContent;
-}
-
-function downloadFile(content, filename) {
-    // Create a Blob object from the content
-    const blob = new Blob([content], { type: 'message/rfc822' });
-
-    // Create a temporary URL for the Blob
+    const blob = new Blob([emlContent], { type: 'message/rfc822' });
     const url = URL.createObjectURL(blob);
 
-    // Create a link element to trigger the download
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
-
-    // Trigger the download
+    a.download = 'mail.eml';
     document.body.appendChild(a);
     a.click();
 
-    // Cleanup
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 }
 
-async function fetchImageAsBase64(url) {
-    // Fetch the image and convert it to base64
+async function fetchFileAsBase64(url) {
     const response = await fetch(url);
-    const blob = await response.blob();
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    });
+    if (!response.ok) {
+        throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
+    }
+    const buffer = await response.arrayBuffer();
+    return arrayBufferToBase64(buffer);
 }
 
 function arrayBufferToBase64(buffer) {
@@ -207,4 +158,3 @@ function arrayBufferToBase64(buffer) {
     }
     return window.btoa(binary);
 }
-
