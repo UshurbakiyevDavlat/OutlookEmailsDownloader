@@ -1,0 +1,30 @@
+{
+    "manifest_version": 2,
+    "name": "Outlook Email Downloader",
+    "version": "1.0",
+    "description": "Download emails from Microsoft Outlook",
+    "permissions": [
+        "activeTab",
+        "downloads",
+        "<all_urls>"
+    ],
+    "browser_action": {
+        "default_popup": "popup.html",
+        "default_icon": {
+            "16": "images/favicon.png",
+            "48": "images/favicon.png",
+            "128": "images/favicon.png"
+        }
+    },
+    "icons": {
+        "16": "images/favicon.png",
+        "48": "images/favicon.png",
+        "128": "images/favicon.png"
+    },
+    "content_scripts": [
+        {
+            "matches": ["*://outlook.office.com/*"],
+            "js": ["content.js"]
+        }
+    ]
+}
