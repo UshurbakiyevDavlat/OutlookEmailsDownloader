@@ -45,6 +45,14 @@ async function getEmailContent() {
     const bodyElement = document.querySelector("#UniqueMessageBody");
     if (bodyElement) {
         emailContent.body = bodyElement.innerHTML;
+        const embeddedImages = bodyElement.querySelectorAll('img[data-imagetype="AttachmentByCid"]');
+        embeddedImages.forEach(image => {
+            const attachmentInfo = {
+                name: image.alt || "Embedded Image",
+                url: image.src
+            };
+            emailContent.attachments.push(attachmentInfo);
+        });
     }
 
     const attachments = document.querySelectorAll('.wide-content-host [role="listbox"] > div > div');
