@@ -59,11 +59,15 @@ async function getEmailContent() {
             console.log('Open File Preview')
             await delay(1000)
 
-            emailContent.attachments.push(await getAttachment());
+            const attachmentHash = await getAttachment()
+            emailContent.attachments.push(attachmentHash);
 
             // Close preview
-            document.querySelectorAll('.ms-Modal-scrollableContent > div > div')[0].querySelector(
-                'button[title="Close"]').click()
+            const mainBlock = document.querySelectorAll('.ms-Modal-scrollableContent > div > div')[0]
+            let closeBlock = mainBlock.querySelector("button[aria-label='Закрыть']") ?? mainBlock.querySelector("button[aria-label='Close']")
+            closeBlock = mainBlock.querySelector("button[aria-label='Жабу']") ?? closeBlock
+
+            closeBlock.click()
             console.log('Close File Preview')
             await delay(1000)
         }
