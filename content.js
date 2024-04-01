@@ -1,5 +1,5 @@
 // Define constants for timeouts
-const EMAIL_DOWNLOAD_DELAY = 1000;
+const EMAIL_DOWNLOAD_DELAY = 3000;
 const ATTACHMENT_PREVIEW_DELAY = 1000;
 
 // Listen for messages from the extension
