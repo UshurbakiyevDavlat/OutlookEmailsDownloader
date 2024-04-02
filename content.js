@@ -1,36 +1,27 @@
 chrome.runtime.onMessage.addListener(
     async (request, sender, sendResponse) => {
         if (request.action === "downloadEmail") {
-            for (let i = 0; i < 3; i++) {
-                console.log('Step: ' + i)
-                await downloadEmail(request, sender, sendResponse, 2000 * i)
-            }
+            await downloadEmail(request, sender, sendResponse, request.amountOfEmails)
         }
     },
 );
 
-async function downloadEmail(request, sender, sendResponse, scrollDown) {
-    const listOfEmailItems = document.querySelectorAll('#MailList .customScrollBar > div > div > div > div');
+async function downloadEmail(request, sender, sendResponse, amountOfEmails) {
 
     const emailsContent = [];
-    for (let email of listOfEmailItems) {
-        if (
-            email.role !== 'heading'
-            && email.clientHeight > 0
-        ) {
-            email.click();
-            await delay(1000);
-            console.log('downloadEmail accept');
-            const emailContent = await getEmailContent();
-            console.log(emailContent);
-            emailsContent.push(emailContent);
-            await downloadEML(emailContent)
-        }
+    for (let i = 0; i < amountOfEmails; i++) {
+        document.querySelector("#MailList .customScrollBar div[aria-selected='true']");
+        await delay(1000);
+        console.log('downloadEmail accept');
+        const emailContent = await getEmailContent();
+        console.log(emailContent);
+        emailsContent.push(emailContent);
+        await downloadEML(emailContent)
+        document.querySelector("#MailList .customScrollBar div[aria-selected='true']").parentElement.parentElement.nextElementSibling.querySelector("div[aria-selected='false']").click()
     }
+
     console.log(emailsContent);
     sendResponse({ content: emailsContent });
-    const positionY = 1000 + scrollDown;
-    document.querySelector('#MailList .customScrollBar').scroll(0, positionY);
 }
 
 async function getEmailContent() {
