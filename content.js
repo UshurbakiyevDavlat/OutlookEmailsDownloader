@@ -82,16 +82,10 @@ async function getAttachment() {
         filePath = filePathImageElement.src;
     }
 
-    const attachmentInfo = {
+    return {
         name: fileName,
         url: filePath
     };
-
-    if (isImageAttachment(fileName)) {
-        attachmentInfo.isImage = true;
-    }
-
-    return attachmentInfo;
 }
 
 function isImageAttachment(fileName) {
