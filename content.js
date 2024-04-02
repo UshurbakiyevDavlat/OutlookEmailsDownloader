@@ -1,12 +1,7 @@
-// Define constants for timeouts
-const EMAIL_DOWNLOAD_DELAY = 1000;
-const ATTACHMENT_PREVIEW_DELAY = 1000;
-const SCROLL_DELAY = 1000;
+const DELAY_MS = 1000;
 
-// Listen for messages from the extension
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     if (request.action === "downloadEmail") {
-        // Download email content
         const emailsContent = await downloadEmails();
         sendResponse({ content: emailsContent });
     }
@@ -15,18 +10,15 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
 async function downloadEmails() {
     const emailsContent = [];
 
-    // Scroll to the bottom of the page to load all email items
-    await scrollToBottom();
+    await scrollToBottom('#MailList .customScrollBar > div > div > div > div');
 
-    // Loop through email items
     const listOfEmailItems = document.querySelectorAll('#MailList .customScrollBar > div > div > div > div');
     for (let email of listOfEmailItems) {
         if (email.role !== 'heading' && email.clientHeight > 0) {
-            // Ensure email item is visible
             await ensureElementVisible(email);
 
             email.click();
-            await delay(EMAIL_DOWNLOAD_DELAY);
+            await delay(DELAY_MS);
             const emailContent = await getEmailContent();
             emailsContent.push(emailContent);
             await downloadEML(emailContent);
@@ -35,7 +27,6 @@ async function downloadEmails() {
 
     return emailsContent;
 }
-
 
 async function getEmailContent() {
     const emailContent = {
@@ -52,15 +43,15 @@ async function getEmailContent() {
 
     const bodyElement = document.querySelector("#UniqueMessageBody");
     if (bodyElement) {
-        await scrollToBottomOfElement(bodyElement);
-
         emailContent.body = bodyElement.innerHTML;
-
         const embeddedImages = bodyElement.querySelectorAll('img[data-imagetype="AttachmentByCid"]');
+        let counter = 0;
+
         embeddedImages.forEach(image => {
             const attachmentInfo = {
-                name: "Embedded Image",
-                url: image.src
+                name: "Embedded Image" + counter++,
+                url: image.src,
+                isImage: true
             };
             emailContent.attachments.push(attachmentInfo);
         });
@@ -69,22 +60,12 @@ async function getEmailContent() {
     const attachments = document.querySelectorAll('.wide-content-host [role="listbox"] > div > div');
     for (let attachment of attachments) {
         attachment.click();
-        await delay(ATTACHMENT_PREVIEW_DELAY);
+        await delay(DELAY_MS);
         const attachmentInfo = await getAttachment();
         emailContent.attachments.push(attachmentInfo);
     }
 
     return emailContent;
-}
-
-async function scrollToBottomOfElement(element) {
-    return new Promise((resolve) => {
-        const scrollHeight = element.scrollHeight;
-        element.scrollTo({ top: scrollHeight, behavior: 'smooth' });
-        setTimeout(() => {
-            resolve();
-        }, SCROLL_DELAY);
-    });
 }
 
 async function getAttachment() {
@@ -94,43 +75,48 @@ async function getAttachment() {
     let filePath = '';
     const filePathElement = previewWindow[1].querySelector('object');
     const filePathImageElement = previewWindow[1].querySelector('img');
+
     if (filePathElement) {
         filePath = filePathElement.data;
     } else if (filePathImageElement) {
         filePath = filePathImageElement.src;
     }
 
-    return {
+    const attachmentInfo = {
         name: fileName,
         url: filePath
     };
+
+    if (isImageAttachment(fileName)) {
+        attachmentInfo.isImage = true;
+    }
+
+    return attachmentInfo;
 }
 
-function delay(time) {
-    return new Promise(resolve => setTimeout(resolve, time));
+function isImageAttachment(fileName) {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'];
+    const extension = fileName.split('.').pop().toLowerCase();
+    return imageExtensions.includes(`.${extension}`);
 }
 
-function ensureElementVisible(element) {
+async function scrollToBottom(selector) {
     return new Promise((resolve) => {
-        if (element.getBoundingClientRect().top >= 0 && element.getBoundingClientRect().bottom <= window.innerHeight) {
+        const element = document.querySelector(selector);
+        if (!element) {
             resolve();
-        } else {
-            element.scrollIntoView({ behavior: "smooth" });
-            setTimeout(() => {
-                resolve();
-            }, SCROLL_DELAY);
+            return;
         }
-    });
-}
-
-async function scrollToBottom() {
-    return new Promise((resolve) => {
-        const scrollHeight = document.documentElement.scrollHeight;
-        window.scrollTo({ top: scrollHeight, behavior: 'smooth' });
+        const scrollHeight = element.scrollHeight;
+        element.scrollTo({ top: scrollHeight, behavior: 'smooth' });
         setTimeout(() => {
             resolve();
-        }, SCROLL_DELAY);
+        }, DELAY_MS);
     });
+}
+
+async function delay(time) {
+    return new Promise(resolve => setTimeout(resolve, time));
 }
 
 async function downloadEML(content) {
@@ -163,15 +149,28 @@ ${content.body}
     for (let attachment of content.attachments) {
         if (attachment.url) {
             try {
-                const fileBase64 = await fetchFileAsBase64(attachment.url);
-                emlContent += `--boundary123
+                let attachmentContent = '';
+                if (attachment.isImage) {
+                    attachmentContent = await fetchImageAsBase64(attachment.url);
+                    emlContent += `--boundary123
+Content-Type: image/jpeg; name="${attachment.name}"
+Content-Disposition: inline; filename="${attachment.name}"
+Content-Transfer-Encoding: base64
+
+${attachmentContent}
+
+`;
+                } else {
+                    attachmentContent = await fetchFileAsBase64(attachment.url);
+                    emlContent += `--boundary123
 Content-Type: application/octet-stream; name="${attachment.name}"
 Content-Disposition: attachment; filename="${attachment.name}"
 Content-Transfer-Encoding: base64
 
-${fileBase64}
+${attachmentContent}
 
 `;
+                }
             } catch (error) {
                 console.error(`Failed to process ${attachment.name}:`, error);
             }
@@ -193,6 +192,20 @@ ${fileBase64}
     URL.revokeObjectURL(url);
 }
 
+async function fetchImageAsBase64(url) {
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch ${url}: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
 async function fetchFileAsBase64(url) {
     const response = await fetch(url);
     if (!response.ok) {
@@ -209,4 +222,17 @@ function arrayBufferToBase64(buffer) {
         binary += String.fromCharCode(bytes[i]);
     }
     return window.btoa(binary);
+}
+
+async function ensureElementVisible(element) {
+    return new Promise((resolve) => {
+        if (element.getBoundingClientRect().top >= 0 && element.getBoundingClientRect().bottom <= window.innerHeight) {
+            resolve();
+        } else {
+            element.scrollIntoView({ behavior: "smooth" });
+            setTimeout(() => {
+                resolve();
+            }, DELAY_MS);
+        }
+    });
 }
