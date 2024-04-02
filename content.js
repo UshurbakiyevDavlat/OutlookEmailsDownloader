@@ -1,6 +1,7 @@
 // Define constants for timeouts
-const EMAIL_DOWNLOAD_DELAY = 3000;
+const EMAIL_DOWNLOAD_DELAY = 1000;
 const ATTACHMENT_PREVIEW_DELAY = 1000;
+const SCROLL_DELAY = 1000;
 
 // Listen for messages from the extension
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
@@ -14,10 +15,16 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
 async function downloadEmails() {
     const emailsContent = [];
 
+    // Scroll to the bottom of the page to load all email items
+    await scrollToBottom();
+
     // Loop through email items
     const listOfEmailItems = document.querySelectorAll('#MailList .customScrollBar > div > div > div > div');
     for (let email of listOfEmailItems) {
         if (email.role !== 'heading' && email.clientHeight > 0) {
+            // Ensure email item is visible
+            await ensureElementVisible(email);
+
             email.click();
             await delay(EMAIL_DOWNLOAD_DELAY);
             const emailContent = await getEmailContent();
@@ -28,6 +35,7 @@ async function downloadEmails() {
 
     return emailsContent;
 }
+
 
 async function getEmailContent() {
     const emailContent = {
@@ -87,6 +95,29 @@ async function getAttachment() {
 
 function delay(time) {
     return new Promise(resolve => setTimeout(resolve, time));
+}
+
+function ensureElementVisible(element) {
+    return new Promise((resolve) => {
+        if (element.getBoundingClientRect().top >= 0 && element.getBoundingClientRect().bottom <= window.innerHeight) {
+            resolve();
+        } else {
+            element.scrollIntoView({ behavior: "smooth" });
+            setTimeout(() => {
+                resolve();
+            }, SCROLL_DELAY);
+        }
+    });
+}
+
+async function scrollToBottom() {
+    return new Promise((resolve) => {
+        const scrollHeight = document.documentElement.scrollHeight;
+        window.scrollTo({ top: scrollHeight, behavior: 'smooth' });
+        setTimeout(() => {
+            resolve();
+        }, SCROLL_DELAY);
+    });
 }
 
 async function downloadEML(content) {
