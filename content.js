@@ -52,11 +52,14 @@ async function getEmailContent() {
 
     const bodyElement = document.querySelector("#UniqueMessageBody");
     if (bodyElement) {
+        await scrollToBottomOfElement(bodyElement);
+
         emailContent.body = bodyElement.innerHTML;
+
         const embeddedImages = bodyElement.querySelectorAll('img[data-imagetype="AttachmentByCid"]');
         embeddedImages.forEach(image => {
             const attachmentInfo = {
-                name: image.alt || "Embedded Image",
+                name: "Embedded Image",
                 url: image.src
             };
             emailContent.attachments.push(attachmentInfo);
@@ -72,6 +75,16 @@ async function getEmailContent() {
     }
 
     return emailContent;
+}
+
+async function scrollToBottomOfElement(element) {
+    return new Promise((resolve) => {
+        const scrollHeight = element.scrollHeight;
+        element.scrollTo({ top: scrollHeight, behavior: 'smooth' });
+        setTimeout(() => {
+            resolve();
+        }, SCROLL_DELAY);
+    });
 }
 
 async function getAttachment() {
