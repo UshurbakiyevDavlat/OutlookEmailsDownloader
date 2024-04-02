@@ -1,29 +1,10 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Outlook Email Downloader</title>
-    <style>
-        body {
-            width: 200px;
-            padding: 10px;
-            font-family: Arial, sans-serif;
-            color: #000 !important;
-        }
-
-        button {
-            width: 100%;
-            padding: 5px;
-            margin-top: 10px;
-            cursor: pointer;
-        }
-    </style>
-</head>
 <body>
-    <div>
-        <h3>Email Downloader</h3>
-        <button id="downloadButton">Download Emails</button>
-        <script src="popup.js"></script>
-    </div>
+<div>
+    <h3>Email Downloader</h3>
+    <label for="amountOfEmails">Input amount of emails:</label>
+    <input type="number" id="amountOfEmails" />
+    <button id="downloadButton">Download Emails</button>
+    <span id="status">Read to download!!!</span>
+    <script src="popup.js"></script>
+</div>
 </body>
-</html>
