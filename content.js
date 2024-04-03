@@ -12,7 +12,14 @@ async function downloadEmails(request, sender, sendResponse, amountOfEmails) {
     const emailsContent = [];
 
     for (let i = 0; i < amountOfEmails; i++) {
-        document.querySelector("#MailList .customScrollBar div[aria-selected='true']");
+        if (document.querySelector("#MailList .customScrollBar div[aria-selected='true']")) {
+            document.querySelector("#MailList .customScrollBar div[aria-selected='true']")
+        } else {
+            document.querySelector("#MailList .customScrollBar div[aria-selected='false']").click();
+            await delay(DELAY_MS);
+            document.querySelectorAll(".allowTextSelection")[1].click();
+        }
+
         await delay(DELAY_MS);
         console.log('downloadEmail accept');
 
