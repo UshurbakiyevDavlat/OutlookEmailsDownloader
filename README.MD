@@ -1,4 +1,8 @@
 ## Установка расширения (пример)
-![img.png](images/img.png)
-![img_1.png](images/img_1.png)
-![img_1.gif](images/img_1.gif)
+![1.png](images/1.png)
+
+![2.png](images/2.png)
+
+![3.png](images/3.png)
+
+![4.png](images/4.png)
