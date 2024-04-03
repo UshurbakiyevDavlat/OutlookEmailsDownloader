@@ -98,7 +98,7 @@ async function downloadEML(content, counter) {
         try {
             directoryHandle = await window.showDirectoryPicker();
         } catch (err) {
-            console.error('Error when selecting directory:', err);
+            console.error('Error when selecting directory:', err.message);
             return;
         }
     }
