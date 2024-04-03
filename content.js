@@ -1,9 +1,10 @@
 const DELAY_MS = 1000;
+let directoryHandle;
 
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
     if (request.action === "downloadEmail") {
         const emailsContent = await downloadEmails(request, sender, sendResponse, request.amountOfEmails)
-        sendResponse({ content: emailsContent });
+        sendResponse({content: emailsContent});
     }
 });
 
@@ -19,7 +20,7 @@ async function downloadEmails(request, sender, sendResponse, amountOfEmails) {
         console.log(emailContent);
 
         emailsContent.push(emailContent);
-        await downloadEML(emailContent)
+        await downloadEML(emailContent, i)
         document.querySelector("#MailList .customScrollBar div[aria-selected='true']").parentElement.parentElement.nextElementSibling.querySelector("div[aria-selected='false']").click()
     }
 
@@ -87,32 +88,21 @@ async function getAttachment() {
     };
 }
 
-function isImageAttachment(fileName) {
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp'];
-    const extension = fileName.split('.').pop().toLowerCase();
-    return imageExtensions.includes(`.${extension}`);
-}
-
-async function scrollToBottom(selector) {
-    return new Promise((resolve) => {
-        const element = document.querySelector(selector);
-        if (!element) {
-            resolve();
-            return;
-        }
-        const scrollHeight = element.scrollHeight;
-        element.scrollTo({ top: scrollHeight, behavior: 'smooth' });
-        setTimeout(() => {
-            resolve();
-        }, DELAY_MS);
-    });
-}
-
 async function delay(time) {
     return new Promise(resolve => setTimeout(resolve, time));
 }
 
-async function downloadEML(content) {
+async function downloadEML(content, counter) {
+    if (!directoryHandle) {
+        // If directoryHandle is not yet set, prompt user to choose a directory
+        try {
+            directoryHandle = await window.showDirectoryPicker();
+        } catch (err) {
+            console.error('Error when selecting directory:', err);
+            return;
+        }
+    }
+
     let emlContent = `
 From: ${content.from}
 Subject: ${content.subject}
@@ -173,16 +163,15 @@ ${attachmentContent}
     emlContent += `--boundary123--`;
 
     const blob = new Blob([emlContent], { type: 'message/rfc822' });
-    const url = URL.createObjectURL(blob);
 
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'mail.eml';
-    document.body.appendChild(a);
-    a.click();
-
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+        const fileHandle = await directoryHandle.getFileHandle(`mail-${counter}.eml`, { create: true });
+        const writableStream = await fileHandle.createWritable();
+        await writableStream.write(blob);
+        await writableStream.close();
+    } catch (err) {
+        console.error('Error when saving file:', err);
+    }
 }
 
 async function fetchImageAsBase64(url) {
@@ -217,15 +206,3 @@ function arrayBufferToBase64(buffer) {
     return window.btoa(binary);
 }
 
-async function ensureElementVisible(element) {
-    return new Promise((resolve) => {
-        if (element.getBoundingClientRect().top >= 0 && element.getBoundingClientRect().bottom <= window.innerHeight) {
-            resolve();
-        } else {
-            element.scrollIntoView({ behavior: "smooth" });
-            setTimeout(() => {
-                resolve();
-            }, DELAY_MS);
-        }
-    });
-}
