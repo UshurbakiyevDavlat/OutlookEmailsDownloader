@@ -1,7 +1,7 @@
 document.getElementById('downloadButton').addEventListener('click', () => {
     const amountOfEmails = Number(document.getElementById('amountOfEmails').value);
     if (amountOfEmails) {
-        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        chrome.tabs.query({active: true, currentWindow: true}, (tabs) => {
             const messageData = {
                 action: "downloadEmail",
                 amountOfEmails: amountOfEmails,
