@@ -2,15 +2,7 @@
 
 1. Перейти в Управление Расширениями прописав **chrome://extensions/** в адресной строке
 2. Переключаем в режим разработки (Developer mode) и Загружаем не распакованное (Load unpacked)
-
-![1.png](images/1.png)
-
-![2.png](images/2.png)
-
 3. Заново открываем Microsoft Outlook (https://outlook.office.com/mail/) и выбираем кол-во писем для скачивания
-
-![3.png](images/3.png)
-![4.png](images/4.png)
 
 ### Необходимо доделать
 1) Загрузка файлов которые грузятся из фрейма в данном случае (Word, Excel)
